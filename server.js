@@ -21,6 +21,39 @@ app.use(
 
 // ---------- HEALTH CHECK ----------
 app.get("/", (req, res) => res.send("Backend is running ✅"));
+// ===== Lead tracking routes =====
+const fs = require('fs');
+const FILE = './leads.json';
+const ADMIN_PASS = process.env.ADMIN_PASS || 'careernext@2026';
+const read = () => { try { return JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch (e) { return {}; } };
+const write = (d) => fs.writeFileSync(FILE, JSON.stringify(d));
+const isAdmin = (req, res, next) =>
+  req.headers['x-admin-pass'] === ADMIN_PASS ? next() : res.status(401).json({ success: false, message: 'Unauthorized' });
+
+// registration form yahan stage bhejta hai (public)
+app.post('/api/track', (req, res) => {
+  const b = req.body || {};
+  const email = String(b.email || '').trim().toLowerCase();
+  if (!email) return res.json({ success: false });
+  const db = read(), now = new Date().toISOString();
+  const old = db[email] || { id: email, started_at: now };
+  const stage = Math.max(old.stage || 1, +b.stage || 1);
+  db[email] = { ...old, ...b, id: email, email, stage, updated_at: now,
+    reg_at: stage >= 3 ? (old.reg_at || now) : old.reg_at };
+  write(db); res.json({ success: true });
+});
+
+app.get('/api/leads', isAdmin, (req, res) => res.json({ success: true, leads: Object.values(read()) }));
+
+app.post('/api/leads/update', isAdmin, (req, res) => {
+  const db = read(), { id, ...patch } = req.body || {};
+  if (db[id]) { Object.assign(db[id], patch); write(db); }
+  res.json({ success: true });
+});
+
+app.post('/api/leads/delete', isAdmin, (req, res) => {
+  const db = read(); delete db[(req.body || {}).id]; write(db); res.json({ success: true });
+});
 
 // =====================================================
 //                 EMAIL OTP SECTION
