@@ -3,8 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const crypto = require("crypto");
 const Razorpay = require("razorpay");
-const nodemailer = require("nodemailer");
-
+ 
 const app = express();
 app.use(express.json());
 
