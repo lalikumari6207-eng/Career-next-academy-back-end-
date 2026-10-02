@@ -41,43 +41,43 @@ const hashOtp = (email, otp) =>
 
 const isValidEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
-// >>>>>> EMAIL SETTINGS <<<<<<
-// Render > Environment me ye 2 variables daalna:
-// EMAIL_USER = yourgmail@gmail.com
-// EMAIL_APP_PASSWORD = Gmail App Password (16 letters, bina space ke)
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_APP_PASSWORD,
-  },
-  connectionTimeout: 15000,
-  greetingTimeout: 15000,
-  socketTimeout: 20000,
-});
-
+// >>>>>> EMAIL SETTINGS (Brevo) <<<<<<
 async function sendOtpEmail(email, otp) {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_APP_PASSWORD) {
-    // Email settings nahi hain to testing mode: OTP logs me dikhega
+  const apiKey = process.env.BREVO_API_KEY;
+  const senderEmail = process.env.BREVO_SENDER_EMAIL || process.env.BREVO_SENDER;
+
+  if (!apiKey || !senderEmail) {
     console.log(`[DEV MODE] OTP for ${email}: ${otp}`);
     return;
   }
 
-  await transporter.sendMail({
-    from: `"Career Next Academy" <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject: "Your OTP Code",
-    text: `Your OTP is ${otp}. It is valid for 5 minutes. Do not share it with anyone.`,
-    html: `
-      <div style="font-family:Arial,sans-serif;max-width:420px;margin:auto;padding:20px;border:1px solid #eee;border-radius:8px">
-        <h2 style="margin:0 0 12px">Your OTP Code</h2>
-        <p style="font-size:32px;letter-spacing:6px;font-weight:bold;margin:12px 0">${otp}</p>
-        <p style="color:#555;margin:0">Valid for 5 minutes. Do not share this code with anyone.</p>
-      </div>
-    `,
+  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "api-key": apiKey,
+      "Content-Type": "application/json",
+      accept: "application/json",
+    },
+    body: JSON.stringify({
+      sender: {
+        name: process.env.BREVO_SENDER_NAME || "Career Next Academy",
+        email: senderEmail,
+      },
+      to: [{ email }],
+      subject: "Your OTP Code",
+      htmlContent: `
+        <div style="font-family:Arial,sans-serif;max-width:420px;margin:auto;padding:20px;border:1px solid #eee;border-radius:8px">
+          <h2 style="margin:0 0 12px">Your OTP Code</h2>
+          <p style="font-size:32px;letter-spacing:6px;font-weight:bold;margin:12px 0">${otp}</p>
+          <p style="color:#555;margin:0">Valid for 5 minutes. Do not share this code with anyone.</p>
+        </div>`,
+    }),
   });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Brevo error ${response.status}: ${text}`);
+  }
 }
 
 // POST /api/send-otp   body: { email }
